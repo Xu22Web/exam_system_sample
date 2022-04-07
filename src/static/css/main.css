@@ -1,0 +1,22 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    background: none;
+  }
+  body {
+    font-family: siyuanheiti;
+  }
+  :root {
+    /* --themeColor: #66a8ff;
+    --themeBg: #f4f4f4; */
+  }
+
+  
