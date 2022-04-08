@@ -108,11 +108,13 @@ const imgCanvas = ref(null)
 const loading = ref(true)
 // 匹配
 const match = ref(false)
+const matchOnce = ref(false)
 // 错误
 const error = ref(false)
 // 媒体流
 let mediaStream;
-
+// 可信度
+const minConfidence = 0.65
 // 属性
 const props = defineProps({
   /**
@@ -134,20 +136,22 @@ const props = defineProps({
    */
   delay: {
     type: Number,
-    default: 2000
+    default: 5000
   }
 })
 // 摄像头状态
 const { open, mimetype, delay } = toRefs(props)
 
 // 事件触发
-const emits = defineEmits(['media', 'error', 'match', 'loadMod'])
+const emits = defineEmits(['media', 'error', 'match', 'find', 'loadMod'])
 // open
 watch(open, (open) => {
   if (!error.value) {
     if (open) {
       openMedia()
     } else {
+      match.value = false
+      matchOnce.value = false
       closeMedia()
     }
   }
@@ -181,44 +185,7 @@ const openMedia = async () => {
       video.value.play();
       await initMod()
       // 播放时人脸识别
-      video.value.addEventListener('timeupdate', async () => {
-        if (!!faceapi.nets.ssdMobilenetv1.params && video.value && canvas.value) {
-          // 配置
-          const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.65 })
-          // 匹配结果
-          const results = await faceapi.detectSingleFace(video.value, options)
-          // 显示
-          const dims = faceapi.matchDimensions(canvas.value, video.value, true)
-          if (results) {
-            // 匹配
-            match.value = true
-            // 检测
-            const detections = faceapi.resizeResults([results], dims)
-            const { x, y, width, height } = detections[0].box
-            // 绘制矩形框
-            const ctx = canvas.value.getContext("2d");
-            ctx.beginPath();
-            ctx.lineWidth = "4";
-            ctx.strokeStyle = "#7dff7d";
-            ctx.rect(x, y, width, height);
-            ctx.stroke();
-            // 触发
-            const { file, dataURL } = createFile(detections[0].box)
-            if (file) {
-              handleFile({ status: true, file, dataURL })
-            }
-
-            // 绘制
-            // faceapi.draw.drawDetections(canvas.value, detections)
-          } else {
-            // 匹配
-            match.value = false
-            // 触发
-            handleFile({ status: false, file: null, dataURL: '' })
-
-          }
-        }
-      })
+      video.value.addEventListener('timeupdate', handleFace)
     }
 
   } catch (err) {
@@ -227,7 +194,51 @@ const openMedia = async () => {
     console.error(err);
   }
 };
+// 处理人脸
+const handleFace = async () => {
+  if (!!faceapi.nets.ssdMobilenetv1.params && video.value && canvas.value) {
+    // 配置
+    const options = new faceapi.SsdMobilenetv1Options({ minConfidence })
+    // 匹配结果
+    const results = await faceapi.detectSingleFace(video.value, options)
+    // 显示
+    const dims = faceapi.matchDimensions(canvas.value, video.value, true)
+    if (results) {
+      // 匹配
+      match.value = true
+      // 检测
+      const detections = faceapi.resizeResults([results], dims)
+      const { x, y, width, height } = detections[0].box
+      // 绘制矩形框
+      const ctx = canvas.value.getContext("2d");
+      ctx.beginPath();
+      ctx.lineWidth = "4";
+      ctx.strokeStyle = "#7dff7d";
+      ctx.rect(x, y, width, height);
+      ctx.stroke();
+      // 触发
+      const { file, dataURL } = createFile(detections[0].box)
+      // 多次延时触发
+      if (file) {
+        handleFile({ status: true, file, dataURL })
+      }
+      // 单次触发
+      if (!matchOnce.value) {
+        emits('find', { status: true, file, dataURL })
+        matchOnce.value = true
+      }
 
+      // 绘制
+      // faceapi.draw.drawDetections(canvas.value, detections)
+    } else {
+      // 匹配
+      match.value = false
+      // 触发
+      handleFile({ status: false, file: null, dataURL: '' })
+
+    }
+  }
+}
 // 生成文件
 const createFile = (box) => {
   if (canvas.value && video.value) {
@@ -262,7 +273,6 @@ const dataURLtoFile = (dataURI, type) => {
 }
 // 关闭摄像头
 const closeMedia = () => {
-  match.value = false
   if (mediaStream) {
     mediaStream.getTracks().forEach(track => {
       track.stop();
