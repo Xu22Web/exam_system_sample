@@ -242,11 +242,17 @@ const handleFace = async () => {
 // 生成文件
 const createFile = (box) => {
   if (canvas.value && video.value) {
+    // 视频宽高
+    const videoH = constraints.video.height
+    const videoW = constraints.video.width
+    // 人脸位置
     const { x, y, width, height } = box
     //获取 `canvas`元素，根据`video`中的数据进行图片绘制 `ctx.drawImage()`；
     const ctx = imgCanvas.value.getContext('2d');
     const max = Math.max(width, height)
-    ctx.drawImage(video.value, x, y, max, max, 0, 0, 320, 320);
+    const newX = x + max >= videoW ? videoW - max : x <= 0 ? 0 : x
+    const newY = y + max >= videoH ? videoH - max : y <= 0 ? 0 : y
+    ctx.drawImage(video.value, newX, newY, max, max, 0, 0, 320, 320);
     //将 `canvas`转换为链接
     const dataURL = imgCanvas.value.toDataURL(mimetype.value);
     document.querySelector('#img').src = dataURL
